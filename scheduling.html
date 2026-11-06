@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bellwood AI Scheduling Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Open+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: three screens side by side (access-center agent, patient phone, referring doctor) above a strip of backend measures */
+:root{
+  --bg:#0B252D; --panel:#103440; --panel2:#0E2E38; --card:#F6F8F7; --cardfg:#123B45; --fg:#EAF2F1; --muted:#9FB6B9; --line:rgba(255,255,255,0.12); --cline:#D5E2DF;
+  --teal:#3FC0A6; --teal2:#2B6F7A; --yellow:#FFC928; --orange:#EF7046; --blue:#8FDBFF; --ink:#0B252D;
+  --f-display:'Bricolage Grotesque','Arial Black',Arial,sans-serif; --f-body:'Open Sans','Segoe UI',Arial,sans-serif; --f-mono:'JetBrains Mono',Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1440px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding-block:14px;border-bottom:1px solid var(--line)}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px}
+.brand span{color:var(--yellow)}
+.tag{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--yellow);color:var(--ink);padding:3px 9px;border-radius:999px;text-decoration:none}
+.tag.t{background:var(--teal)}
+header a.tag{margin-left:auto}
+main .wrap{padding-block:16px 40px;display:flex;flex-direction:column;gap:16px}
+.lead{color:var(--muted);max-width:110ch;margin:0}
+.screens{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,.85fr) minmax(0,1fr);gap:14px;align-items:start}
+.label{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow);margin:0 0 6px}
+/* agent console */
+.app{background:var(--card);color:var(--cardfg);border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.appbar{background:#123B45;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 14px;font-weight:700}
+.appbar small{font-weight:400;color:#BFD8D5}
+.appbar .dot{width:8px;height:8px;border-radius:50%;background:var(--teal)}
+.cols{display:grid;grid-template-columns:270px minmax(0,1fr);min-height:560px}
+.inbox{border-right:1px solid var(--cline);background:#EEF4F2;overflow-y:auto;max-height:620px}
+.inbox h4{margin:0;padding:10px 12px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#4A5A60;display:flex;justify-content:space-between}
+.ref{display:block;width:100%;text-align:left;font:inherit;color:inherit;background:transparent;border:0;border-top:1px solid var(--cline);padding:10px 12px;cursor:pointer}
+.ref:hover{background:#E2EDEA}
+.ref[aria-selected="true"]{background:#fff;box-shadow:inset 3px 0 0 var(--teal2)}
+.ref b{display:block;font-size:13px}
+.ref .m{font-size:12px;color:#4A5A60;margin-right:6px}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:999px;margin-right:4px}
+.p-urg{background:#F7DAD3;color:#9A3412} .p-rout{background:#DCEBE6;color:#1F5F55} .p-soon{background:#FFF1C7;color:#7A5B00} .p-done{background:#123B45;color:#fff} .p-fax{background:#E5ECEA;color:#4A5A60}
+.detail{padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.detail h3{margin:0;font-family:var(--f-display);font-size:20px}
+.box{border:1px solid var(--cline);border-radius:10px;padding:10px 12px;background:#fff}
+.box h5{margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#9A6B00}
+.kv{display:grid;grid-template-columns:130px minmax(0,1fr);gap:3px 10px;font-size:13px}
+.kv span:nth-child(odd){color:#4A5A60}
+.ai{background:#F0FAF7;border-color:#BFE3D8}
+.conf{font-family:var(--f-mono);font-size:11px;color:#1F5F55}
+.warn{background:#FFF7E0;border:1px solid #F2D27A;border-radius:8px;padding:6px 10px;font-size:12.5px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--cline);text-align:left}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#4A5A60}
+tr.best{background:#F0FAF7}
+td.n{text-align:right;font-variant-numeric:tabular-nums}
+.btn{font:inherit;font-weight:700;border:0;border-radius:8px;padding:9px 14px;cursor:pointer}
+.btn.pri{background:#123B45;color:#fff} .btn.pri:hover{background:#2B6F7A}
+.btn.sec{background:#E5ECEA;color:#123B45}
+.btn:focus-visible,.ref:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+.btn:disabled{opacity:.5;cursor:default}
+.radio{accent-color:#123B45}
+.toast{background:#123B45;color:#fff;border-radius:8px;padding:8px 12px;font-size:13px}
+/* phone */
+.phone{background:#0A1A20;border-radius:34px;padding:12px;border:1px solid #2A4A55;box-shadow:0 20px 50px rgba(0,0,0,.4);max-width:330px}
+.screen{background:#F2F4F3;border-radius:24px;min-height:560px;color:#123B45;display:flex;flex-direction:column;overflow:hidden}
+.sbar{display:flex;justify-content:space-between;font-size:11px;padding:8px 16px 4px;color:#4A5A60;font-weight:600}
+.chathead{text-align:center;padding:6px 0 10px;border-bottom:1px solid #DDE5E3;font-size:12px}
+.chathead b{display:block;font-size:14px}
+.msgs{flex:1;padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.bub{max-width:85%;padding:8px 11px;border-radius:16px;font-size:13px;line-height:1.4}
+.in{background:#fff;border:1px solid #DDE5E3;align-self:flex-start;border-bottom-left-radius:4px}
+.out{background:#2B6F7A;color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px 12px}
+.quick button{font:inherit;font-size:12px;font-weight:600;border:1px solid #2B6F7A;color:#2B6F7A;background:#fff;border-radius:999px;padding:5px 10px;cursor:pointer}
+.empty{color:#7A8A90;font-size:12.5px;text-align:center;margin-top:40px;padding:0 20px}
+/* referrer */
+.portal{background:var(--card);color:var(--cardfg);border-radius:14px;overflow:hidden;box-shadow:0 20px 50px rgba(0,0,0,.35)}
+.portal .body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.tl{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.tl li{position:relative;padding:0 0 14px 26px;font-size:13px}
+.tl li::before{content:"";position:absolute;left:6px;top:4px;width:10px;height:10px;border-radius:50%;background:#C7D3D0}
+.tl li::after{content:"";position:absolute;left:10px;top:16px;bottom:0;width:2px;background:#DDE5E3}
+.tl li:last-child::after{display:none}
+.tl li.on::before{background:var(--teal2)}
+.tl li.now::before{background:var(--yellow);box-shadow:0 0 0 4px rgba(255,201,40,.3)}
+.tl small{display:block;color:#4A5A60}
+/* backend */
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.mt{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.mt .v{font-family:var(--f-display);font-weight:800;font-size:26px;line-height:1.1}
+.mt .l{font-size:12px;color:var(--muted)}
+.mt .s{font-family:var(--f-mono);font-size:11px;color:var(--teal)}
+.how{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.step{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+.step b{display:block;font-family:var(--f-display);font-size:16px;margin-bottom:4px;color:var(--yellow)}
+.step p{margin:0;color:var(--fg);font-size:13px}
+h2{font-family:var(--f-display);font-size:18px;margin:8px 0 0}
+@media (max-width:1100px){.screens{grid-template-columns:1fr}.phone{margin:0 auto}}
+@media (max-width:640px){.cols{grid-template-columns:1fr}.inbox{max-height:260px;border-right:0;border-bottom:1px solid var(--cline)}.kv{grid-template-columns:110px minmax(0,1fr)}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header><div class="wrap">
+  <div class="brand">Bellwood<span>.</span> AI scheduling, prototype</div>
+  <span class="tag">Fictional patients</span>
+  <a class="tag t" href="analytics.html">Open the backend analytics ›</a>
+</div></header>
+
+<main><div class="wrap">
+<p class="lead">This is what the recommendation looks like in practice. A referral arrives, the AI reads it and suggests the earliest suitable slot across every site, an access-center agent confirms it, the patient books by text, and the referring doctor sees each step. Click a referral on the left and book it to see all three screens update.</p>
+
+<div class="screens">
+  <div>
+    <p class="label">1 · Access-center agent</p>
+    <div class="app" role="region" aria-label="Access center console">
+      <div class="appbar"><i class="dot" aria-hidden="true"></i>Referral work-queue <small id="qCount"></small></div>
+      <div class="cols">
+        <div class="inbox" id="inbox" role="listbox" aria-label="Incoming referrals"></div>
+        <div class="detail" id="detail"></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <p class="label">2 · Patient’s phone</p>
+    <div class="phone"><div class="screen">
+      <div class="sbar"><span>9:41</span><span>5G ▮▮▮</span></div>
+      <div class="chathead"><b>Bellwood Health</b>Text messages</div>
+      <div class="msgs" id="msgs"><p class="empty">Book a referral in the agent console and the patient’s text appears here.</p></div>
+      <div class="quick" id="quick"></div>
+    </div></div>
+  </div>
+  <div>
+    <p class="label">3 · Referring doctor’s portal</p>
+    <div class="portal">
+      <div class="appbar"><i class="dot" aria-hidden="true"></i>My referrals <small id="refDoc"></small></div>
+      <div class="body" id="portal"></div>
+    </div>
+  </div>
+</div>
+
+<h2>What runs behind it</h2>
+<div class="how">
+  <div class="step"><b>Read</b><p>The AI turns faxes, e-referrals and call notes into structured fields: patient, reason, specialty, urgency and insurance. Anything below 85% confidence goes to a person.</p></div>
+  <div class="step"><b>Match</b><p>It ranks open slots across all sites by clinical fit, wait, travel time and the patient’s stated preferences. It never uses payer type to rank patients.</p></div>
+  <div class="step"><b>Confirm</b><p>The agent approves in one click. The patient gets a text with options, reminders at 7 days and 48 hours, and a one-tap way to reschedule.</p></div>
+  <div class="step"><b>Close the loop</b><p>The referring doctor sees every status change, and the visit summary is sent from the EHR within 72 hours of the appointment.</p></div>
+  <div class="step"><b>Learn</b><p>Cancellations are backfilled from the waitlist, and every booking, override and no-show feeds the analytics dashboard.</p></div>
+</div>
+
+<h2>Backend measures for the pilot <span class="tag" style="vertical-align:3px">Illustrative targets</span></h2>
+<div class="strip" id="strip"></div>
+<p class="lead" style="font-size:12px">Live measures from this demo are on the left; the rest are the targets the pilot is judged against at month 9. The full analytics, with provider productivity, waits and call data, are on the <a href="analytics.html" style="color:var(--yellow)">analytics page</a>.</p>
+</div></main>
+
+<script>
+(function(){
+const REFS=[
+ {id:'R-10482',name:'Maria Lopez',age:58,spec:'Orthopedics',reason:'Right knee pain, 6 months; X-ray shows moderate osteoarthritis',urg:'Routine',ch:'Fax',from:'Dr. Hughes, Prairie Family Medicine',ins:'Commercial',pref:'Weekday mornings',conf:94,home:'Omaha (west)'},
+ {id:'R-10483',name:'James Carter',age:66,spec:'Cardiology',reason:'Exertional chest tightness, abnormal stress ECG',urg:'Urgent',ch:'E-referral',from:'Dr. Singh, Riverbend Clinic',ins:'Medicare',pref:'Any time',conf:97,home:'Council Bluffs'},
+ {id:'R-10484',name:'Aisha Bello',age:34,spec:'Behavioral health',reason:'Persistent low mood, PHQ-9 score 14',urg:'Soon',ch:'Phone',from:'Dr. Novak, Elm Street Primary Care',ins:'Medicaid',pref:'After 4 pm',conf:81,home:'Omaha (north)'},
+ {id:'R-10485',name:'Tom Becker',age:47,spec:'Gastroenterology',reason:'Iron-deficiency anaemia, screening colonoscopy overdue',urg:'Soon',ch:'Fax',from:'Dr. Hughes, Prairie Family Medicine',ins:'Commercial',pref:'Fridays',conf:89,home:'Bellevue'},
+ {id:'R-10486',name:'Linda Moore',age:71,spec:'Orthopedics',reason:'Left hip pain, difficulty walking',urg:'Routine',ch:'E-referral',from:'Dr. Okafor, Westside Health',ins:'Medicare',pref:'Needs transport',conf:92,home:'Papillion'}
+];
+const SLOTS={
+ Orthopedics:[['Suburban','Dr. Shah','Tue 12 Nov, 9:20 am',6,'22 min'],['Suburban','Dr. Shah','Thu 14 Nov, 10:40 am',8,'22 min'],['Core','Dr. Ruiz','Mon 2 Dec, 9:00 am',26,'12 min']],
+ Cardiology:[['Core','Dr. Ahmed','Mon 11 Nov, 2:20 pm',5,'15 min'],['North','Dr. Lee','Wed 13 Nov, 8:40 am',7,'28 min'],['Core','Dr. Ahmed','Tue 19 Nov, 11:00 am',13,'15 min']],
+ 'Behavioral health':[['West','Dr. Park','Fri 15 Nov, 4:30 pm',9,'18 min'],['Telehealth','Dr. Park','Wed 13 Nov, 5:00 pm',7,'at home'],['Core','Dr. Grant','Mon 25 Nov, 4:15 pm',19,'20 min']],
+ Gastroenterology:[['Suburban','Dr. Wong','Fri 15 Nov, 10:00 am',9,'14 min'],['Core','Dr. Fox','Fri 22 Nov, 8:30 am',16,'19 min'],['North','Dr. Wong','Fri 29 Nov, 1:00 pm',23,'31 min']]
+};
+const state={sel:REFS[0].id,booked:{},msgs:[],tel:{}};
+const $=id=>document.getElementById(id);
+const pillU=u=>`<span class="pill ${u==='Urgent'?'p-urg':u==='Soon'?'p-soon':'p-rout'}">${u}</span>`;
+
+function inbox(){
+  const open=REFS.filter(r=>!state.booked[r.id]).length;
+  $('qCount').textContent=`· ${open} waiting · oldest 3 h`;
+  $('inbox').innerHTML='<h4><span>Incoming</span><span>AI read</span></h4>'+REFS.map(r=>`<button type="button" class="ref" role="option" aria-selected="${r.id===state.sel}" data-id="${r.id}">
+    <b>${r.name}, ${r.age}</b><span class="m">${r.spec}</span><br>${state.booked[r.id]?'<span class="pill p-done">Booked</span>':pillU(r.urg)}<span class="pill p-fax">${r.ch}</span><span class="m">${r.conf}% confident</span></button>`).join('');
+  document.querySelectorAll('.ref').forEach(b=>b.addEventListener('click',()=>{state.sel=b.dataset.id;draw();}));
+}
+function detail(){
+  const r=REFS.find(x=>x.id===state.sel), S=SLOTS[r.spec], bk=state.booked[r.id];
+  $('detail').innerHTML=`
+    <div><h3>${r.name}</h3><span class="m" style="color:#4A5A60">${r.id} · received by ${r.ch.toLowerCase()} from ${r.from}</span></div>
+    <div class="box ai"><h5>What the AI read from the referral <span class="conf">· ${r.conf}% confidence</span></h5>
+      <div class="kv"><span>Specialty</span><span>${r.spec}</span><span>Reason</span><span>${r.reason}</span><span>Urgency</span><span>${pillU(r.urg)} suggested from symptoms and test results</span><span>Insurance</span><span>${r.ins} (checked, in network)</span><span>Preference</span><span>${r.pref}</span><span>Lives in</span><span>${r.home}</span></div></div>
+    ${r.conf<85?'<div class="warn"><b>Needs a human check.</b> The AI is less than 85% sure about this referral, so an agent must confirm the urgency before booking.</div>':''}
+    <div class="box"><h5>Best open slots across all sites</h5>
+      <table><thead><tr><th></th><th>Site</th><th>Clinician</th><th>Slot</th><th class="n">Wait</th><th class="n">Travel</th></tr></thead><tbody>
+      ${S.map((s,i)=>`<tr class="${i===0?'best':''}"><td><input class="radio" type="radio" name="slot" id="s${i}" value="${i}" ${i===0?'checked':''} ${bk?'disabled':''}></td><td><label for="s${i}">${s[0]}</label></td><td>${s[1]}</td><td>${s[2]}</td><td class="n">${s[3]} d</td><td class="n">${s[4]}</td></tr>`).join('')}
+      </tbody></table>
+      <p style="margin:8px 0 0;font-size:12.5px;color:#4A5A60">${r.spec==='Orthopedics'?'The suburban clinic has open slots, so the AI offers them first. The core clinic is booked out for about four weeks.':'Ranked by clinical fit, wait and travel time.'}</p></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      ${bk?`<div class="toast">Booked ${SLOTS[r.spec][bk.slot][2]} at ${SLOTS[r.spec][bk.slot][0]}. Text sent to the patient and the referrer updated.</div>`:
+      `<button type="button" class="btn pri" id="bookBtn">Book and text the patient</button><button type="button" class="btn sec" id="offerBtn">Text 3 options instead</button>`}
+    </div>`;
+  if(!bk){ $('bookBtn').onclick=()=>book(r,+document.querySelector('input[name=slot]:checked').value,false); $('offerBtn').onclick=()=>book(r,0,true); }
+}
+function book(r,slot,offer){
+  state.booked[r.id]={slot,offer,confirmed:!offer}; state.cur=r.id;
+  const S=SLOTS[r.spec], first=r.name.split(' ')[0];
+  state.msgs=offer?[
+    {t:'in',x:`Hi ${first}, ${r.from.split(',')[0]} has referred you to Bellwood ${r.spec}. Please reply with a number to book:`},
+    {t:'in',x:S.map((s,i)=>`${i+1}. ${s[2]} at ${s[0]}`).join('<br>')}
+  ]:[
+    {t:'in',x:`Hi ${first}, ${r.from.split(',')[0]} has referred you to Bellwood ${r.spec}. You are booked for <b>${S[slot][2]}</b> with ${S[slot][1]} at our ${S[slot][0]} clinic.`},
+    {t:'in',x:'Reply C to confirm, R to choose another time, or T if you need transport.'}
+  ];
+  state.quick=offer?S.map((s,i)=>({l:String(i+1),act:()=>pick(r,i)})):[{l:'C',act:()=>confirm(r)},{l:'R',act:()=>{state.msgs.push({t:'out',x:'R'},{t:'in',x:'Here are other times:<br>'+S.map((s,i)=>`${i+1}. ${s[2]}`).join('<br>')});state.quick=S.map((s,i)=>({l:String(i+1),act:()=>pick(r,i)}));draw();}},{l:'T',act:()=>{state.msgs.push({t:'out',x:'T'},{t:'in',x:'No problem. A free ride is booked for you. Reply C to confirm the visit.'});draw();}}];
+  draw();
+}
+function pick(r,i){ state.booked[r.id].slot=i; state.msgs.push({t:'out',x:String(i+1)}); confirm(r,true); }
+function confirm(r,silent){ const S=SLOTS[r.spec][state.booked[r.id].slot]; state.booked[r.id].confirmed=true;
+  if(!silent) state.msgs.push({t:'out',x:'C'}); state.msgs.push({t:'in',x:`Confirmed: ${S[2]} at ${S[0]}. We will remind you 7 days and 48 hours before.`}); state.quick=[]; draw(); }
+function phone(){
+  if(!state.msgs.length){ return; }
+  $('msgs').innerHTML=state.msgs.map(m=>`<div class="bub ${m.t}">${m.x}</div>`).join('');
+  $('quick').innerHTML=(state.quick||[]).map((q,i)=>`<button type="button" data-i="${i}">${q.l}</button>`).join('');
+  document.querySelectorAll('#quick button').forEach(b=>b.onclick=()=>state.quick[+b.dataset.i].act());
+  $('msgs').scrollTop=1e6;
+}
+function portal(){
+  const r=REFS.find(x=>x.id===(state.cur||state.sel)), bk=state.booked[r.id], S=bk&&SLOTS[r.spec][bk.slot];
+  $('refDoc').textContent='· '+r.from.split(',')[0];
+  const steps=[['Referral received',`${r.ch} · today 8:12 am`,true],['Read and checked by Bellwood','AI with agent review',true],['Appointment booked',bk?(bk.confirmed?`${S[2]} · ${S[0]}`:'Waiting for the patient to choose'):'In the work-queue',!!bk],['Patient seen','Status updates after the visit',false],['Visit summary sent to you','Within 72 hours of the visit',false]];
+  const cur=steps.findIndex(s=>!s[2]);
+  $('portal').innerHTML=`<div><b>${r.name}</b> · ${r.spec}<br><span style="font-size:12px;color:#4A5A60">${r.id}</span></div>
+    <ul class="tl">${steps.map((s,i)=>`<li class="${s[2]?'on':i===cur?'now':''}">${s[0]}<small>${s[1]}</small></li>`).join('')}</ul>
+    <div class="box"><h5>Your practice this month</h5><div class="kv"><span>Referrals sent</span><span>38</span><span>Booked in 7 days</span><span>71%</span><span>Summaries received</span><span>94%</span></div></div>`;
+}
+function strip(){
+  const n=Object.keys(state.booked).length, offers=Object.values(state.booked).filter(b=>b.offer).length;
+  const items=[[`${n} / ${REFS.length}`,'Referrals booked in this demo','live'],[`${REFS.filter(r=>r.conf<85).length}`,'Sent to a person for review (below 85% confidence)','live'],
+    ['< 48 h','Referral to booking, target','baseline set in month 1'],['≥ 60%','Booked within 7 days at pilot sites by month 9','gate metric'],['< 10%','Agent overrides of AI suggestions','model quality'],
+    ['≥ 30%','Cancelled slots refilled from the waitlist','capacity'],['0','Gap in wait by payer type','fairness check'],['< 5%','Scheduling calls abandoned','was 5–6%']];
+  $('strip').innerHTML=items.map(x=>`<div class="mt"><div class="v">${x[0]}</div><div class="l">${x[1]}</div><div class="s">${x[2]}</div></div>`).join('');
+}
+function draw(){ inbox(); detail(); phone(); portal(); strip(); }
+draw();
+})();
+</script>
+
+</html>

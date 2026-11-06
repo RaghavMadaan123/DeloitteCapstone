@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bellwood Access Analytics</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Open+Sans:wght@400;600;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: slim sticky filter bar, then a dense grid of analysis panels; every number is computed from the synthetic datasets below */
+:root{
+  --bg:#0B252D; --panel:#103440; --panel2:#0E2E38; --fg:#EAF2F1; --muted:#9FB6B9; --line:rgba(255,255,255,0.12);
+  --teal:#3FC0A6; --teal2:#2B6F7A; --yellow:#FFC928; --orange:#EF7046; --blue:#8FDBFF; --slate:#7C9BA0; --ink:#0B252D;
+  --f-display:'Bricolage Grotesque','Arial Black',Arial,sans-serif; --f-body:'Open Sans','Segoe UI',Arial,sans-serif; --f-mono:'JetBrains Mono',Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--fg);font-family:var(--f-body);font-size:14px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:1400px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:rgba(11,37,45,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+header.bar .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;padding-block:10px}
+.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:-.3px}
+.brand span{color:var(--yellow)}
+.tag{font-family:var(--f-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;background:var(--yellow);color:var(--ink);padding:3px 9px;border-radius:999px}
+.filters{display:flex;flex-wrap:wrap;gap:10px;margin-left:auto;align-items:center}
+.filters label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+select,button.dl{font:inherit;font-size:13px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+button.dl{cursor:pointer;font-weight:600}
+button.dl:hover,select:hover{border-color:var(--yellow)}
+select:focus-visible,button.dl:focus-visible{outline:2px solid var(--yellow);outline-offset:1px}
+main .wrap{padding-block:16px 40px;display:flex;flex-direction:column;gap:14px}
+.note{font-size:12px;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kpi .v{font-family:var(--f-display);font-weight:800;font-size:26px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi .l{font-size:12px;color:var(--muted)}
+.kpi .s{font-size:11px;font-family:var(--f-mono);margin-top:2px}
+.bad{color:var(--orange)} .good{color:var(--teal)} .warnc{color:var(--yellow)}
+h2{font-family:var(--f-display);font-weight:700;font-size:18px;margin:10px 0 0;letter-spacing:-.2px}
+.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:12px}
+.p{grid-column:span 6;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.p.w4{grid-column:span 4} .p.w8{grid-column:span 8} .p.w12{grid-column:span 12}
+.p h3{margin:0;font-size:14px;font-weight:700}
+.insight{font-size:13px;background:var(--panel2);border-left:3px solid var(--yellow);padding:7px 10px;border-radius:0 8px 8px 0}
+.chart{position:relative;height:260px} .chart.t{height:320px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+td.n,th.n{text-align:right}
+.heatwrap{overflow-x:auto}
+.heat{display:grid;grid-template-columns:44px repeat(108,minmax(5px,1fr));gap:1px;min-width:720px;align-items:center}
+.heat .c{height:22px}
+.heat .h{font-family:var(--f-mono);font-size:10px;color:var(--muted)}
+.c.b{background:var(--teal)} .c.o{background:var(--yellow)} .c.a{background:var(--slate)} .c.n{background:var(--orange)} .c.l{background:#28434B}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+@media (max-width:900px){.p,.p.w4,.p.w8{grid-column:span 12}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="bar"><div class="wrap">
+  <div class="brand">Bellwood<span>.</span> Access &amp; productivity analytics</div><a class="tag" style="background:var(--teal);text-decoration:none" href="scheduling.html">See the AI scheduling prototype ›</a>
+  <span class="tag">Synthetic data</span>
+  <div class="filters">
+    <label for="fSpec">Specialty <select id="fSpec"></select></label>
+    <label for="fSite">Site <select id="fSite"></select></label>
+    <label for="fChan">Referral channel <select id="fChan"></select></label>
+  </div>
+</div></header>
+
+<main><div class="wrap">
+<p class="note">All records below are generated synthetic data, built so the totals match the case (74% of referrals booked, 12% no-shows, 28-day core and 11-day suburban ortho waits). Productivity and pay benchmarks are placeholders standing in for MGMA medians. Change the filters and every chart recalculates.</p>
+
+<div class="kpis" id="kpis"></div>
+
+<h2>Provider productivity and pay</h2>
+<div class="grid">
+  <div class="p w8"><h3>Productivity vs pay, each dot is one provider</h3>
+    <div class="chart t"><canvas id="cScatter" aria-label="Scatter of providers: wRVUs as percent of benchmark against compensation per wRVU as percent of benchmark"></canvas></div>
+    <div class="insight" id="iScatter"></div></div>
+  <div class="p w4"><h3>Providers to review</h3>
+    <div class="tbl"><table id="tOut"><thead><tr><th>Provider</th><th>Specialty</th><th class="n">wRVU %</th><th class="n">$/wRVU %</th></tr></thead><tbody></tbody></table></div>
+    <p class="note">Listed when pay per wRVU is above 115% of benchmark and output is below 85%. A flag starts a conversation about templates and coding, not a pay cut.</p></div>
+  <div class="p w6"><h3>Template hours vs hours actually booked, weekly</h3>
+    <div class="chart"><canvas id="cHours" aria-label="Clinic template hours and booked hours per provider"></canvas></div>
+    <div class="insight" id="iHours"></div></div>
+  <div class="p w6"><h3>Pay and output by specialty, median</h3>
+    <div class="tbl"><table id="tSpec"><thead><tr><th>Specialty</th><th class="n">Providers</th><th class="n">wRVUs</th><th class="n">vs bench</th><th class="n">$/wRVU</th><th class="n">vs bench</th><th class="n">Utilisation</th></tr></thead><tbody></tbody></table></div></div>
+  <div class="p w12"><h3>One provider’s week in 5-minute slots</h3>
+    <div class="row"><label for="fProv" class="note">Provider</label><select id="fProv"></select><span class="note" id="provInfo"></span></div>
+    <div class="heatwrap"><div class="heat" id="heat"></div></div>
+    <div class="legend"><span><i style="background:var(--teal)"></i>Booked</span><span><i style="background:var(--yellow)"></i>Open</span><span><i style="background:var(--slate)"></i>Admin-blocked</span><span><i style="background:var(--orange)"></i>No-show</span><span><i style="background:#28434B"></i>Lunch</span></div>
+    <div class="insight" id="iHeat"></div></div>
+</div>
+
+<h2>Waiting times</h2>
+<div class="grid">
+  <div class="p w6"><h3>Median wait to first visit by specialty and site</h3>
+    <div class="chart"><canvas id="cWaitSpec" aria-label="Median days from referral to visit by specialty and site"></canvas></div>
+    <div class="insight" id="iWaitSpec"></div></div>
+  <div class="p w6"><h3>How long patients wait, distribution</h3>
+    <div class="chart"><canvas id="cWaitHist" aria-label="Histogram of days from referral to first visit"></canvas></div>
+    <div class="insight" id="iWaitHist"></div></div>
+  <div class="p w6"><h3>Longer waits mean more no-shows</h3>
+    <div class="chart"><canvas id="cNoShow" aria-label="No-show rate by wait bucket"></canvas></div>
+    <div class="insight" id="iNoShow"></div></div>
+  <div class="p w6"><h3>Median wait, week by week</h3>
+    <div class="chart"><canvas id="cTrend" aria-label="Weekly median wait trend"></canvas></div>
+    <div class="insight" id="iTrend"></div></div>
+</div>
+
+<h2>Referral leakage</h2>
+<div class="grid">
+  <div class="p w4"><h3>Booking rate by referral channel</h3>
+    <div class="chart"><canvas id="cChan" aria-label="Share of referrals booked by channel"></canvas></div>
+    <div class="insight" id="iChan"></div></div>
+  <div class="p w8"><h3>Referring practices that lose the most patients</h3>
+    <div class="chart"><canvas id="cPrac" aria-label="Referrals not booked by referring practice"></canvas></div>
+    <div class="insight" id="iPrac"></div></div>
+</div>
+
+<h2>Scheduling calls</h2>
+<div class="grid">
+  <div class="p w8"><h3>Daily call abandonment against the 5% target</h3>
+    <div class="chart"><canvas id="cCalls" aria-label="Daily call abandonment rate with 5 percent target"></canvas></div>
+    <div class="insight" id="iCalls"></div></div>
+  <div class="p w4"><h3>Abandonment by hour of day</h3>
+    <div class="chart"><canvas id="cHour" aria-label="Call abandonment by hour"></canvas></div>
+    <div class="insight" id="iHour"></div></div>
+</div>
+
+<h2>Data</h2>
+<div class="p w12" style="grid-column:auto"><div class="row">
+  <button type="button" class="dl" data-ds="providers">Download providers.csv</button>
+  <button type="button" class="dl" data-ds="referrals">Download referrals.csv</button>
+  <button type="button" class="dl" data-ds="calls">Download calls.csv</button>
+  <span class="note" id="dlNote">Generated in your browser from a fixed seed, so every visitor sees the same numbers.</span>
+</div></div>
+</div></main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+(function(){
+/* ---------- seeded random ---------- */
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+let R=mulberry(20261106);
+const rn=()=>{let u=0,v=0;while(!u)u=R();while(!v)v=R();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);};
+const pick=(arr,w)=>{let x=R()*w.reduce((a,b)=>a+b,0);for(let i=0;i<arr.length;i++){x-=w[i];if(x<=0)return arr[i];}return arr[arr.length-1];};
+const median=a=>{if(!a.length)return NaN;const s=[...a].sort((x,y)=>x-y),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+const pct=(a,b)=>b?a/b*100:0, f0=x=>Math.round(x).toLocaleString('en-US'), f1=x=>(Math.round(x*10)/10).toFixed(1);
+
+/* ---------- 1. providers (benchmarks are placeholders, not licensed MGMA data) ---------- */
+const SPECS=[{n:'Orthopedics',k:14,wrvu:8500,cpw:75,w:.2},{n:'Cardiology',k:10,wrvu:8000,cpw:70,w:.14},{n:'Gastroenterology',k:8,wrvu:8200,cpw:68,w:.12},{n:'Neurology',k:7,wrvu:5200,cpw:62,w:.1},{n:'Behavioral health',k:9,wrvu:4300,cpw:60,w:.12},{n:'Primary care',k:22,wrvu:5000,cpw:55,w:.32}];
+const SITES=['Core','Suburban','North','West'], SITEW=[.4,.3,.15,.15], SITEUTIL={Core:.93,Suburban:.71,North:.82,West:.8};
+const providers=[]; let pid=0;
+SPECS.forEach(sp=>{ for(let i=0;i<sp.k;i++){ pid++;
+  const site=sp.n==='Orthopedics'?(i<8?'Core':'Suburban'):pick(SITES,SITEW);
+  const fte=Math.round((0.6+R()*0.4)*10)/10, tmpl=Math.round(36*fte*(0.85+R()*0.2));
+  const util=Math.min(.99,Math.max(.45,SITEUTIL[site]+rn()*.06)), booked=Math.round(tmpl*util*10)/10;
+  let wr=sp.wrvu*fte*(util/0.85)*Math.exp(rn()*.15), cpw=sp.cpw*Math.exp(rn()*.1);
+  if(R()<.1){ wr*=.72; cpw*=1.3; }                  // a few providers paid well above their output
+  providers.push({id:'P'+String(pid).padStart(3,'0'),specialty:sp.n,site,fte,template_hrs_wk:tmpl,booked_hrs_wk:booked,utilisation:+(util*100).toFixed(1),
+    wrvu:Math.round(wr),comp:Math.round(wr*cpw/1000)*1000,bench_wrvu:Math.round(sp.wrvu*fte),bench_cpw:sp.cpw,noshow_rate:0});
+}});
+providers.forEach(p=>{ p.wrvu_pct=+(pct(p.wrvu,p.bench_wrvu)).toFixed(1); p.cpw=+(p.comp/p.wrvu).toFixed(1); p.cpw_pct=+(pct(p.cpw,p.bench_cpw)).toFixed(1); });
+
+/* ---------- 2. referrals: 6,000 over 26 weeks, calibrated to the case ---------- */
+const WAIT={Orthopedics:{Core:28,Suburban:11},Cardiology:21,Gastroenterology:24,Neurology:35,'Behavioral health':30,'Primary care':7};
+const CH=['Fax','Phone','E-referral'], CHW=[.45,.35,.2], CHB={Fax:.66,Phone:.74,'E-referral':.9};
+const PRAC=Array.from({length:40},(_,i)=>({n:'Practice '+String(i+1).padStart(2,'0'),leak:Math.exp(rn()*.35)}));
+const referrals=[];
+for(let i=0;i<6000;i++){
+  const sp=pick(SPECS,SPECS.map(s=>s.w)), spec=sp.n;
+  const site=spec==='Orthopedics'?(R()<.55?'Core':'Suburban'):pick(SITES,SITEW);
+  const ch=pick(CH,CHW), pr=PRAC[Math.floor(R()*40)], week=Math.floor(R()*26);
+  const pBook=Math.min(.97,CHB[ch]/pr.leak*1.02), booked=R()<pBook;
+  let wait=null,attended=false,noshow=false,loop=false;
+  if(booked){ const base=typeof WAIT[spec]==='object'?WAIT[spec][site]:WAIT[spec]*(site==='Core'?1.15:site==='Suburban'?.8:1);
+    wait=Math.max(1,Math.round(base*(1+week*0.006)*Math.exp(rn()*.45)));
+    noshow=R()<Math.min(.32,.045+wait*.0032); attended=!noshow; loop=attended&&R()<.74; }
+  referrals.push({id:'R'+String(i+1).padStart(5,'0'),week:week+1,specialty:spec,site,channel:ch,practice:pr.n,booked,wait_days:wait,no_show:noshow,attended,loop_closed:loop});
+}
+
+/* ---------- 3. scheduling calls: 90 days, hourly ---------- */
+const calls=[];
+for(let d=0;d<90;d++){ const dow=d%7; if(dow>4) continue;
+  for(let h=8;h<18;h++){ const peak=(h===9||h===10?1.8:h===13?1.3:1)*(dow===0?1.35:1);
+    const offered=Math.round(95*peak*(0.85+R()*0.3)); const ab=Math.min(.3,.025+.035*(peak-1)+Math.max(0,rn()*.012));
+    calls.push({day:d+1,weekday:['Mon','Tue','Wed','Thu','Fri'][dow],hour:h,offered,abandoned:Math.round(offered*ab)}); } }
+
+/* ---------- filters ---------- */
+const sel=(id,opts)=>{const s=document.getElementById(id); s.innerHTML=opts.map(o=>`<option>${o}</option>`).join(''); return s;};
+const fSpec=sel('fSpec',['All',...SPECS.map(s=>s.n)]), fSite=sel('fSite',['All',...SITES]), fChan=sel('fChan',['All',...CH]);
+const fProv=document.getElementById('fProv');
+const match=(r)=>(fSpec.value==='All'||r.specialty===fSpec.value)&&(fSite.value==='All'||r.site===fSite.value);
+
+/* ---------- charts ---------- */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const C={}; const mk=(id,cfg)=>{ if(!window.Chart) return; if(C[id]) C[id].destroy(); C[id]=new Chart(document.getElementById(id),cfg); };
+if(window.Chart){ Chart.defaults.color=css('--muted'); Chart.defaults.borderColor='rgba(255,255,255,0.1)'; Chart.defaults.font.family="'Open Sans', Arial, sans-serif"; Chart.defaults.maintainAspectRatio=false; Chart.defaults.plugins.legend.labels.boxWidth=10; }
+const SPCOL={Orthopedics:'#FFC928',Cardiology:'#EF7046',Gastroenterology:'#8FDBFF',Neurology:'#C59BFF','Behavioral health':'#3FC0A6','Primary care':'#A9BCC0'};
+const say=(id,html)=>{document.getElementById(id).innerHTML=html;};
+
+function render(){
+  const P=providers.filter(match), Rf=referrals.filter(r=>match(r)&&(fChan.value==='All'||r.channel===fChan.value));
+  const B=Rf.filter(r=>r.booked), A=B.filter(r=>r.attended), waits=B.map(r=>r.wait_days);
+  const CL=calls, off=CL.reduce((a,c)=>a+c.offered,0), ab=CL.reduce((a,c)=>a+c.abandoned,0);
+  const mw=median(waits), bk=pct(B.length,Rf.length), ns=pct(B.filter(r=>r.no_show).length,B.length), lc=pct(A.filter(r=>r.loop_closed).length,A.length);
+  const mWr=median(P.map(p=>p.wrvu_pct)), mCp=median(P.map(p=>p.cpw_pct)), util=median(P.map(p=>p.utilisation));
+  const k=[[f0(Rf.length),'Referrals in view',''],[f1(bk)+'%','Booked within 60 days',bk<80?'bad':'good','target 85%'],[isNaN(mw)?'–':f0(mw)+' d','Median wait to first visit',mw>14?'bad':'good','target ≤14 d'],
+    [f1(ns)+'%','No-show rate',ns>10?'bad':'good','target 8%'],[f1(lc)+'%','Visits reported back',lc<90?'warnc':'good','target 95%'],[f0(P.length),'Providers in view',''],
+    [isNaN(mWr)?'–':f0(mWr)+'%','Median output vs benchmark',mWr<95?'warnc':'good'],[isNaN(mCp)?'–':f0(mCp)+'%','Median pay per wRVU vs bench',mCp>105?'bad':'good'],[f1(pct(ab,off))+'%','Calls abandoned (all sites)',pct(ab,off)>5?'bad':'good','target <5%']];
+  document.getElementById('kpis').innerHTML=k.map(x=>`<div class="kpi"><div class="v ${x[2]}">${x[0]}</div><div class="l">${x[1]}</div>${x[3]?`<div class="s">${x[3]}</div>`:''}</div>`).join('');
+
+  /* productivity vs pay */
+  const bySpec={}; P.forEach(p=>{(bySpec[p.specialty]=bySpec[p.specialty]||[]).push(p);});
+  mk('cScatter',{type:'scatter',data:{datasets:Object.keys(bySpec).map(s=>({label:s,data:bySpec[s].map(p=>({x:p.wrvu_pct,y:p.cpw_pct,id:p.id,site:p.site})),backgroundColor:SPCOL[s],pointRadius:5,pointHoverRadius:7}))},
+    options:{animation:false,plugins:{tooltip:{callbacks:{label:c=>`${c.raw.id} (${c.dataset.label}, ${c.raw.site}): output ${c.raw.x}%, pay/wRVU ${c.raw.y}%`}}},
+      scales:{x:{title:{display:true,text:'wRVUs as % of benchmark'},suggestedMin:50,suggestedMax:140},y:{title:{display:true,text:'Pay per wRVU as % of benchmark'},suggestedMin:70,suggestedMax:150}}},
+    plugins:[{id:'q',afterDraw(ch){const {ctx,scales:{x,y}}=ch;ctx.save();ctx.strokeStyle='rgba(255,201,40,0.6)';ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(x.getPixelForValue(100),y.top);ctx.lineTo(x.getPixelForValue(100),y.bottom);ctx.moveTo(x.left,y.getPixelForValue(100));ctx.lineTo(x.right,y.getPixelForValue(100));ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='rgba(239,112,70,0.9)';ctx.font='11px Open Sans';ctx.fillText('Paid more, producing less',x.left+6,y.top+14);ctx.fillStyle='rgba(63,192,166,0.9)';ctx.fillText('Producing more, paid less',x.right-160,y.bottom-8);ctx.restore();}}]});
+  const out=P.filter(p=>p.cpw_pct>115&&p.wrvu_pct<85).sort((a,b)=>b.cpw_pct-a.cpw_pct);
+  document.querySelector('#tOut tbody').innerHTML=out.length?out.map(p=>`<tr><td>${p.id}</td><td>${p.specialty}</td><td class="n bad">${f0(p.wrvu_pct)}</td><td class="n bad">${f0(p.cpw_pct)}</td></tr>`).join(''):'<tr><td colspan="4">No providers meet both flags in this view.</td></tr>';
+  const excess=out.reduce((a,p)=>a+(p.comp-p.wrvu*p.bench_cpw),0);
+  say('iScatter',`${out.length} of ${P.length} providers sit in the top-left box. Paying them at the benchmark rate for the work they do would cost about <b>$${f1(excess/1e6)}M</b> less a year, but the first step is to check their templates and coding.`);
+
+  /* hours */
+  const Hs=[...P].sort((a,b)=>(b.template_hrs_wk-b.booked_hrs_wk)-(a.template_hrs_wk-a.booked_hrs_wk)).slice(0,18);
+  mk('cHours',{type:'bar',data:{labels:Hs.map(p=>p.id),datasets:[{label:'Booked hours',data:Hs.map(p=>p.booked_hrs_wk),backgroundColor:css('--teal')},{label:'Unused template hours',data:Hs.map(p=>+(p.template_hrs_wk-p.booked_hrs_wk).toFixed(1)),backgroundColor:css('--yellow')}]},
+    options:{animation:false,scales:{x:{stacked:true},y:{stacked:true,title:{display:true,text:'Hours per week'}}}}});
+  const idle=P.reduce((a,p)=>a+(p.template_hrs_wk-p.booked_hrs_wk),0), slots=idle*60/20*48;
+  say('iHours',`Providers in this view leave <b>${f0(idle)} template hours a week</b> unbooked. At 20-minute new-patient slots and 48 weeks, that is about <b>${f0(slots)} visits a year</b> of capacity already paid for.`);
+
+  /* specialty table */
+  document.querySelector('#tSpec tbody').innerHTML=SPECS.filter(s=>bySpec[s.n]).map(s=>{const L=bySpec[s.n];const w=median(L.map(p=>p.wrvu)),wp=median(L.map(p=>p.wrvu_pct)),c=median(L.map(p=>p.cpw)),cp=median(L.map(p=>p.cpw_pct)),u=median(L.map(p=>p.utilisation));
+    return `<tr><td>${s.n}</td><td class="n">${L.length}</td><td class="n">${f0(w)}</td><td class="n ${wp<90?'bad':''}">${f0(wp)}%</td><td class="n">$${f1(c)}</td><td class="n ${cp>110?'bad':''}">${f0(cp)}%</td><td class="n">${f0(u)}%</td></tr>`;}).join('');
+
+  /* provider list for heatmap */
+  const cur=fProv.value; fProv.innerHTML=P.map(p=>`<option value="${p.id}">${p.id} · ${p.specialty} · ${p.site}</option>`).join('');
+  if(P.some(p=>p.id===cur)) fProv.value=cur; else if(P.length){ const worst=[...P].sort((a,b)=>a.utilisation-b.utilisation)[0]; fProv.value=worst.id; }
+  drawHeat();
+
+  /* waits by specialty and site */
+  const specs=SPECS.map(s=>s.n).filter(s=>fSpec.value==='All'||s===fSpec.value), sites=SITES.filter(s=>fSite.value==='All'||s===fSite.value);
+  const sysMed=median(referrals.filter(r=>r.booked).map(r=>r.wait_days));
+  mk('cWaitSpec',{type:'bar',data:{labels:specs,datasets:sites.map((st,i)=>({label:st,data:specs.map(sp=>{const w=B.filter(r=>r.specialty===sp&&r.site===st).map(r=>r.wait_days);return w.length>4?median(w):null;}),backgroundColor:['#FFC928','#3FC0A6','#8FDBFF','#A9BCC0'][SITES.indexOf(st)]}))},
+    options:{animation:false,scales:{y:{title:{display:true,text:'Median days'}}}},plugins:[{id:'m',afterDraw(ch){const {ctx,scales:{x,y}}=ch;const yy=y.getPixelForValue(sysMed);ctx.save();ctx.strokeStyle='#EF7046';ctx.setLineDash([6,4]);ctx.beginPath();ctx.moveTo(x.left,yy);ctx.lineTo(x.right,yy);ctx.stroke();ctx.fillStyle='#EF7046';ctx.font='11px Open Sans';ctx.fillText('System median '+f0(sysMed)+' d',x.right-120,yy-5);ctx.restore();}}]});
+  const oc=median(B.filter(r=>r.specialty==='Orthopedics'&&r.site==='Core').map(r=>r.wait_days)), os=median(B.filter(r=>r.specialty==='Orthopedics'&&r.site==='Suburban').map(r=>r.wait_days));
+  say('iWaitSpec',isNaN(oc)||isNaN(os)?`The dashed line is the system-wide median of ${f0(sysMed)} days.`:`Ortho patients wait <b>${f0(oc)} days</b> at the core clinic and <b>${f0(os)} days</b> at suburban for the same service. The dashed line is the system median of ${f0(sysMed)} days.`);
+
+  /* histogram */
+  const bins=[0,7,14,21,28,35,42,56,999], lab=['0–7','8–14','15–21','22–28','29–35','36–42','43–56','57+'];
+  const hc=lab.map((_,i)=>waits.filter(w=>w>bins[i]&&w<=bins[i+1]).length);
+  mk('cWaitHist',{type:'bar',data:{labels:lab,datasets:[{label:'Patients',data:hc,backgroundColor:lab.map((_,i)=>i<2?css('--teal'):i<4?css('--yellow'):css('--orange'))}]},options:{animation:false,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'Days from referral to visit'}},y:{title:{display:true,text:'Patients'}}}}});
+  const over28=pct(waits.filter(w=>w>28).length,waits.length), in14=pct(waits.filter(w=>w<=14).length,waits.length);
+  say('iWaitHist',`<b>${f0(in14)}%</b> of booked patients are seen within 14 days, while <b>${f0(over28)}%</b> wait more than four weeks.`);
+
+  /* no-show by wait */
+  const nb=[[0,7],[8,14],[15,28],[29,42],[43,999]], nl=['0–7 d','8–14 d','15–28 d','29–42 d','43+ d'];
+  const nr=nb.map(([a,b])=>{const g=B.filter(r=>r.wait_days>=a&&r.wait_days<=b);return g.length?+pct(g.filter(r=>r.no_show).length,g.length).toFixed(1):null;});
+  mk('cNoShow',{type:'bar',data:{labels:nl,datasets:[{label:'No-show rate %',data:nr,backgroundColor:nl.map((_,i)=>i<2?css('--teal'):i<3?css('--yellow'):css('--orange'))}]},options:{animation:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,title:{display:true,text:'No-show %'}}}}});
+  say('iNoShow',nr[0]!=null&&nr[4]!=null?`Patients booked within a week miss <b>${f1(nr[0])}%</b> of visits. Those waiting more than six weeks miss <b>${f1(nr[4])}%</b>. Cutting waits also cuts no-shows.`:'Too few bookings in this view to compare wait buckets.');
+
+  /* weekly trend */
+  const wk=Array.from({length:26},(_,i)=>median(B.filter(r=>r.week===i+1).map(r=>r.wait_days)));
+  mk('cTrend',{type:'line',data:{labels:wk.map((_,i)=>'W'+(i+1)),datasets:[{label:'Median wait (days)',data:wk,borderColor:css('--blue'),backgroundColor:'rgba(143,219,255,0.15)',fill:true,pointRadius:2,tension:.3},{label:'Target 14 d',data:wk.map(()=>14),borderColor:css('--teal'),borderDash:[6,4],pointRadius:0}]},options:{animation:false,scales:{y:{beginAtZero:true}}}});
+  const a1=median(wk.slice(0,6).filter(x=>!isNaN(x))), a2=median(wk.slice(-6).filter(x=>!isNaN(x)));
+  say('iTrend',isNaN(a1)||isNaN(a2)?'Not enough weekly data in this view.':`The median wait moved from <b>${f0(a1)} days</b> in the first six weeks to <b>${f0(a2)} days</b> in the last six, so ${a2>a1?'access is slowly getting worse':'access is holding steady'}.`);
+
+  /* channel */
+  const RfAll=referrals.filter(match), chRate=CH.map(c=>{const g=RfAll.filter(r=>r.channel===c);return +pct(g.filter(r=>r.booked).length,g.length).toFixed(1);});
+  mk('cChan',{type:'bar',data:{labels:CH,datasets:[{label:'Booked %',data:chRate,backgroundColor:[css('--orange'),css('--yellow'),css('--teal')]}]},options:{animation:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:100,title:{display:true,text:'% booked'}}}}});
+  say('iChan',`E-referrals are booked <b>${f0(chRate[2])}%</b> of the time against <b>${f0(chRate[0])}%</b> for faxes. Moving fax volume to e-referral is the quickest way to cut the booking leak.`);
+
+  /* practices */
+  const pr=PRAC.map(p=>{const g=Rf.filter(r=>r.practice===p.n);return {n:p.n,tot:g.length,lost:g.filter(r=>!r.booked).length};}).filter(x=>x.tot>=15).map(x=>({...x,rate:pct(x.lost,x.tot)})).sort((a,b)=>b.lost-a.lost).slice(0,12);
+  mk('cPrac',{type:'bar',data:{labels:pr.map(p=>p.n),datasets:[{label:'Referrals never booked',data:pr.map(p=>p.lost),backgroundColor:css('--orange')},{label:'Booked',data:pr.map(p=>p.tot-p.lost),backgroundColor:css('--teal2')}]},
+    options:{animation:false,indexAxis:'y',scales:{x:{stacked:true,title:{display:true,text:'Referrals in 26 weeks'}},y:{stacked:true}},plugins:{tooltip:{callbacks:{afterLabel:c=>`Leak rate ${f0(pr[c.dataIndex].rate)}%`}}}}});
+  const top5=pr.slice(0,5).reduce((a,p)=>a+p.lost,0), allLost=Rf.filter(r=>!r.booked).length;
+  say('iPrac',`The five practices at the top account for <b>${f0(pct(top5,allLost))}%</b> of unbooked referrals in this view. They are the first visits for the referral liaisons.`);
+  drawCalls();
+}
+
+function drawHeat(){
+  const p=providers.find(x=>x.id===fProv.value); if(!p){document.getElementById('heat').innerHTML='';return;}
+  const r=mulberry(parseInt(p.id.slice(1))*7919), u=p.utilisation/100;
+  const days=['Mon','Tue','Wed','Thu','Fri']; let h='<div></div>'; let counts={b:0,o:0,a:0,n:0};
+  for(let s=0;s<108;s++){ const m=8*60+s*5; h+=`<div class="h">${m%60===0?(m/60):''}</div>`; }
+  days.forEach(d=>{ h+=`<div class="h">${d}</div>`; let s=0;
+    while(s<108){ const m=8*60+s*5; if(m>=12*60&&m<13*60){ h+='<div class="c l" title="'+d+' lunch"></div>'; s++; continue; }
+      const len=r()<.6?3:6, x=r(); const st=x<0.06?'a':x<u?(r()<.09?'n':'b'):'o';
+      for(let k=0;k<len&&s<108;k++){ const mm=8*60+s*5; if(mm>=12*60&&mm<13*60) break; counts[st]++;
+        const t=`${d} ${Math.floor(mm/60)}:${String(mm%60).padStart(2,'0')}`; h+=`<div class="c ${st}" title="${t}"></div>`; s++; } } });
+  document.getElementById('heat').innerHTML=h;
+  const tot=counts.b+counts.o+counts.a+counts.n;
+  document.getElementById('provInfo').textContent=`${p.fte} FTE · ${p.template_hrs_wk} template hours a week · ${f0(p.wrvu)} wRVUs a year`;
+  say('iHeat',`${p.id} had <b>${f0(pct(counts.o,tot))}%</b> of clinic time open and <b>${f0(pct(counts.n,tot))}%</b> lost to no-shows this week. Open blocks of 15 minutes or more can be released to the central queue a week ahead.`);
+}
+
+function drawCalls(){
+  const days=[...new Set(calls.map(c=>c.day))];
+  const dr=days.map(d=>{const g=calls.filter(c=>c.day===d);return {d,wd:g[0].weekday,r:pct(g.reduce((a,c)=>a+c.abandoned,0),g.reduce((a,c)=>a+c.offered,0))};});
+  mk('cCalls',{type:'line',data:{labels:dr.map(x=>x.wd+' '+x.d),datasets:[{label:'Abandoned %',data:dr.map(x=>+x.r.toFixed(1)),borderColor:css('--orange'),pointRadius:dr.map(x=>x.r>5?3:1),pointBackgroundColor:css('--orange'),tension:.25},{label:'Target 5%',data:dr.map(()=>5),borderColor:css('--teal'),borderDash:[6,4],pointRadius:0}]},options:{animation:false,scales:{x:{ticks:{maxTicksLimit:12}},y:{beginAtZero:true,title:{display:true,text:'% of calls'}}}}});
+  const over=dr.filter(x=>x.r>5).length, mon=median(dr.filter(x=>x.wd==='Mon').map(x=>x.r)), oth=median(dr.filter(x=>x.wd!=='Mon').map(x=>x.r));
+  say('iCalls',`The line is above the 5% target on <b>${over} of ${dr.length}</b> working days. Mondays run at <b>${f1(mon)}%</b> against ${f1(oth)}% on other days.`);
+  const hr=Array.from({length:10},(_,i)=>{const g=calls.filter(c=>c.hour===8+i);return +pct(g.reduce((a,c)=>a+c.abandoned,0),g.reduce((a,c)=>a+c.offered,0)).toFixed(1);});
+  mk('cHour',{type:'bar',data:{labels:hr.map((_,i)=>(8+i)+':00'),datasets:[{label:'Abandoned %',data:hr,backgroundColor:hr.map(v=>v>5?css('--orange'):css('--teal'))}]},options:{animation:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+  const peak=hr.indexOf(Math.max(...hr));
+  say('iHour',`Abandonment peaks at <b>${8+peak}:00</b>. Adding two agents from 9 to 11 am would cover the worst hours.`);
+}
+
+[fSpec,fSite,fChan].forEach(s=>s.addEventListener('change',render)); fProv.addEventListener('change',drawHeat);
+
+/* ---------- CSV export ---------- */
+const DS={providers,referrals,calls};
+document.querySelectorAll('button.dl').forEach(b=>b.addEventListener('click',()=>{
+  const rows=DS[b.dataset.ds], keys=Object.keys(rows[0]);
+  const csv=[keys.join(','),...rows.map(r=>keys.map(k=>r[k]===null?'':String(r[k]).includes(',')?`"${r[k]}"`:r[k]).join(','))].join('\n');
+  try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download=b.dataset.ds+'.csv'; document.body.appendChild(a); a.click(); a.remove();
+    document.getElementById('dlNote').textContent='If nothing downloaded, open the GitHub version of this page; previews block downloads.'; }catch(e){}
+}));
+render();
+})();
+</script>
+
+</html>
